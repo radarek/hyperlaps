@@ -9,9 +9,15 @@
 #include <BLEServer.h> // BLUETOOTH LIBRARY
 #include <BLE2902.h> // BLUETOOTH LIBRARY
 
-// See the following for generating UUIDs:
-// https://www.uuidgenerator.net/
+#ifndef GAMEPAD_DEFS_FILE
+  #error Please, define GAMEPAD_DEFS_FILE property pointing to gamepad definition file.
+#endif
 
+#define quoteme(x) #x
+#define include_file(x) quoteme(x)
+#include include_file(GAMEPAD_DEFS_FILE)
+#undef quoteme
+#undef include_file
 
 #define SolenoidButton 15
 #define xPin 39
@@ -27,35 +33,24 @@ int xValue = 0;
 
 BLEServer *MyServer = NULL;
 
-// BLUETOOTH IDENTIFIERS - The associated motherboard has the same identifiers, that's why they can communicate with each other
-// The service ID.
-#define serviceID "69159f1c-f430-11ea-adc1-0242ac120002"
-// The position X characteristic ID.
-#define characteristicIDPositionX "ac82943a-f430-11ea-adc1-0242ac120002"
-// The score characteristic ID.
-#define characteristicIDScore "c2de5a5c-f430-11ea-adc1-0242ac120002"
-// The solenoid characteristic ID.
-#define characteristicIDSolenoid "dc92348c-f430-11ea-adc1-0242ac120002"
-// END BLUTOOTH IDENTIFIERS
-
 /* Define our custom characteristic along with it's properties */
 BLECharacteristic customCharacteristicPositionX(
-  characteristicIDPositionX, 
-  BLECharacteristic::PROPERTY_READ | 
+  characteristicIDPositionX,
+  BLECharacteristic::PROPERTY_READ |
   BLECharacteristic::PROPERTY_NOTIFY |
   BLECharacteristic::PROPERTY_WRITE
 );
 
 /* Define our custom characteristic along with it's properties */
 BLECharacteristic customCharacteristicScore(
-  characteristicIDScore, 
+  characteristicIDScore,
   BLECharacteristic::PROPERTY_WRITE
 );
 
 /* Define our custom characteristic along with it's properties */
 BLECharacteristic customCharacteristicSolenoid(
-  characteristicIDSolenoid, 
-  BLECharacteristic::PROPERTY_READ | 
+  characteristicIDSolenoid,
+  BLECharacteristic::PROPERTY_READ |
   BLECharacteristic::PROPERTY_NOTIFY
 );
 
@@ -65,20 +60,19 @@ bool deviceConnected = false;
 bool oldDeviceConnected = false;
 
 class ServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* MyServer) {
-      deviceConnected = true;
-    };
-
-    void onDisconnect(BLEServer* MyServer) {
-      deviceConnected = false;
-    }
+  void onConnect(BLEServer* MyServer) {
+    deviceConnected = true;
+  }
+  void onDisconnect(BLEServer* MyServer) {
+    deviceConnected = false;
+  }
 };
 
 class MyCallbacks: public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic *customCharacteristicScore) {
-      uint8_t* value = customCharacteristicScore->getData();
-      score = value[0];      
-    }
+  void onWrite(BLECharacteristic *customCharacteristicScore) {
+    uint8_t* value = customCharacteristicScore->getData();
+    score = value[0];
+  }
 };
 // END BLUETOOTH data transfer functions
 
@@ -88,17 +82,17 @@ void setup() {
   pinMode(xPin, INPUT);
 
   for (int i = 0; i < LEDS_COUNT; i++) {
-      pinMode(ledPins[i], OUTPUT);
+    pinMode(ledPins[i], OUTPUT);
   }
 
   // BLUETOOTH functions
   // Create and name the BLE Device
-  BLEDevice::init("ESP-GAMEPAD-1");
+  BLEDevice::init(BLEInitLabel);
 
   /* Create the BLE Server */
   MyServer = BLEDevice::createServer();
   MyServer->setCallbacks(new ServerCallbacks());  // Set the function that handles Server Callbacks
-  
+
   /* Add a service to our server */
   BLEService *customService = MyServer->createService(serviceID); //  A random ID has been selected
 
@@ -134,44 +128,44 @@ void setup() {
 void loop() {
   xValue = analogRead(xPin); // IMPORTANT FOR DEBUG: xValue contains Joystick X axis values, theoretically values ​​range from 0 (left) to 4096 (right) (12bits)
   // Serial.println(xValue); // IMPORTANT FOR DEBUG: 1. It is essential to uncomment this line first to analyze the values ​​sent by the Joystick and start calibration
-  
+
   //YOU MUST MODIFY THE FIRST TWO VALUES66666, EXAMPLE HERE, 0 and 4096 must be modified according to your own Joystick
-  mapX = map(xValue, 600, 3300, 0, 255); // IMPORTANT FOR DEBUG: This map() function converts the 12 bits values (4096 values) ​​of xValue to transform them into 8-bit values (255 values), example here, 0 corresponds to 0 and 4096 to 255, the motherboard will only receive values ​​between 0 and 255. Why do this? Because we cannot send a 12-bit value via the BLUETOOTH of the ESP32, we can send a maximum of 8 bits  
+  mapX = map(xValue, 600, 3300, 0, 255); // IMPORTANT FOR DEBUG: This map() function converts the 12 bits values (4096 values) ​​of xValue to transform them into 8-bit values (255 values), example here, 0 corresponds to 0 and 4096 to 255, the motherboard will only receive values ​​between 0 and 255. Why do this? Because we cannot send a 12-bit value via the BLUETOOTH of the ESP32, we can send a maximum of 8 bits
   // Serial.println(mapX); // IMPORTANT FOR DEBUG: 2. It is essential to uncomment this line second to analyze the values ​​sent by the Joystick and start calibration. How do i calibrate: Joystick max left: 10, Joystick max right: 245. Why am I not calibrating to 0 and 255? Because if you go below 0, the value will go to 255 and if you go above 255, the value will go to 0 which will cause a movement opposite to that expected. So it's a margin of safety.
-  
+
   buttonState = digitalRead(SolenoidButton); // buttonState contains the Solenoid Button value
   //Serial.println(buttonState); // IMPORTANT FOR DEBUG: Uncomment this line if you have a problem with the Solenoid Button
-  
+
   Serial.println(score);
     // If Gamepad and Motherboard are connected together
     if (deviceConnected) {
-         for (int i = 0; i < LEDS_COUNT; i++) { // All LEDs are on
-           digitalWrite(ledPins[i], i < score ? HIGH : LOW);
-        }
-    
-        /* Set the value */
-        customCharacteristicPositionX.setValue(&mapX,1);  // This is a value of a single byte, set the position x value
-        customCharacteristicPositionX.notify();  // Notify the Motherboard the position x
-    
-        if (buttonState == HIGH) { // If Solenoid button is pressed
-          buttonValue = 1;       
-        } else {
-          buttonValue = 0;
-        }   
-    
-        customCharacteristicSolenoid.setValue(&buttonValue,1);  // This is a value of a single byte, set Solenoid Button value
-        customCharacteristicSolenoid.notify();  // Notify the Motherboard the Solenoid Button Value
-        delay(40); // Bluetooth stack will go into congestion, if too many packets are sent
+      for (int i = 0; i < LEDS_COUNT; i++) { // All LEDs are on
+        digitalWrite(ledPins[i], i < score ? HIGH : LOW);
+      }
+
+      /* Set the value */
+      customCharacteristicPositionX.setValue(&mapX,1);  // This is a value of a single byte, set the position x value
+      customCharacteristicPositionX.notify();  // Notify the Motherboard the position x
+
+      if (buttonState == HIGH) { // If Solenoid button is pressed
+        buttonValue = 1;
+      } else {
+        buttonValue = 0;
+      }
+
+      customCharacteristicSolenoid.setValue(&buttonValue,1);  // This is a value of a single byte, set Solenoid Button value
+      customCharacteristicSolenoid.notify();  // Notify the Motherboard the Solenoid Button Value
+      delay(40); // Bluetooth stack will go into congestion, if too many packets are sent
     }
-    
+
     // Disconnected with Motherboard
     if (!deviceConnected && oldDeviceConnected) {
-        for (int i = 0; i < LEDS_COUNT; i++) {
-         digitalWrite(ledPins[i], LOW); // All LEDs are off
-        }
-        delay(2000); // Give the bluetooth stack the chance to get things ready
-        MyServer->startAdvertising(); // Restart advertising, trying to reconnect again
-        oldDeviceConnected = deviceConnected;
+      for (int i = 0; i < LEDS_COUNT; i++) {
+        digitalWrite(ledPins[i], LOW); // All LEDs are off
+      }
+      delay(2000); // Give the bluetooth stack the chance to get things ready
+      MyServer->startAdvertising(); // Restart advertising, trying to reconnect again
+      oldDeviceConnected = deviceConnected;
     }
     // connecting
     if (deviceConnected && !oldDeviceConnected) {

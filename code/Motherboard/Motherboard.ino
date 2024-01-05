@@ -1,6 +1,16 @@
 #include "BLEDevice.h"  // Bluetooth libray
 #include <Stepper.h>    // Libray to control unipolar or bipolar stepper motors
 
+#ifndef MOTHERBOARD_DEFS_FILE
+  #error Please, define MOTHERBOARD_DEFS_FILE property pointing to motherboard definition file.
+#endif
+
+#define quoteme(x) #x
+#define include_file(x) quoteme(x)
+#include include_file(MOTHERBOARD_DEFS_FILE)
+#undef quoteme
+#undef include_file
+
 #define enablePin 12  // enablePin allows to activate or deactivate the motor, for example, the motor is activated only when you move the joystick
 #define stepPin 14
 #define dirPin 15
@@ -20,17 +30,6 @@ TaskHandle_t xHandle = NULL;
 
 // initialize stepper library
 Stepper stepper(stepsPerRevolution, stepPin, dirPin);
-
-// BLUETOOTH IDENTIFIERS - The associated gamepad has the same identifiers, that's why they can communicate with each other
-// The service ID.
-static BLEUUID serviceUUID("69159f1c-f430-11ea-adc1-0242ac120002");
-// The position X characteristic ID.
-static BLEUUID charPositionXUUID("ac82943a-f430-11ea-adc1-0242ac120002");
-// The score characteristic ID.
-static BLEUUID charScoreUUID("c2de5a5c-f430-11ea-adc1-0242ac120002");
-// The solenoid characteristic ID.
-static BLEUUID charSolenoidUUID("dc92348c-f430-11ea-adc1-0242ac120002");
-// END BLUTOOTH IDENTIFIERS
 
 static boolean doConnect = false;
 static boolean connected = false;
